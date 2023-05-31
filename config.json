@@ -1,0 +1,21 @@
+{
+    "androidNdk": "",
+    "androidSdk": "",
+    "autoSave": false,
+    "clang": false,
+    "compilerAndroidFlags": "",
+    "compilerFlags": "",
+    "compilerLinuxFlags": "",
+    "compilerWebFlags": "",
+    "emsdk": "/media/djoker/data/emsdk/upstream/emscripten",
+    "javaPath": "",
+    "lastFile": "/media/djoker/data/code/projectos/SDLEditor/test/teste_sdl.cpp",
+    "lastPlatform": 3,
+    "linkingAndroidFlags": "",
+    "linkingFlags": "",
+    "linkingLinuxFlags": "-lSDL2  -lm",
+    "linkingWebFlags": " -s USE_SDL=2 -s FULL_ES3=1   -s MIN_WEBGL_VERSION=2  -s TOTAL_MEMORY=67108864 -s FORCE_FILESYSTEM=1 -D_DEFAULT_SOURCE ",
+    "showConsole": true,
+    "windowHeight": 697,
+    "windowWidth": 1866
+}

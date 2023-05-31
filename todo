@@ -1,0 +1,5 @@
+:android
+:template
+:compileJava
+:processResources UP-TO-DATE
+:load api's to editor

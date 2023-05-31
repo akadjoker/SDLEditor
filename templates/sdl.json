@@ -1,0 +1,32 @@
+{
+    "name":"SDL2",
+
+    "CMP":"",
+    "LINK":"",
+
+    "Linux":
+    {
+        "CMP":"",
+        "LINK":"-lSDL2  -lm"
+
+    },
+    "Android":
+    {
+        "CMP":"",
+        "LINK":""
+    
+    },
+    "Web":
+    {
+        "CMP":"",
+        "LINK":" -s USE_SDL=2 -s FULL_ES3=1   -s MIN_WEBGL_VERSION=2  -s TOTAL_MEMORY=67108864 -s FORCE_FILESYSTEM=1 -D_DEFAULT_SOURCE ",
+    
+        "shell":"sdl.html"
+    },
+    "Windows":
+    {
+        "CMP":"",
+        "LINK":""
+    
+    }
+}

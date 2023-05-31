@@ -1,0 +1,32 @@
+{
+    "name":"GLFW Satic",
+
+    "CMP":"",
+    "LINK":" -lGL -lm",
+
+    "Linux":
+    {
+        "CMP":"",
+        "LINK":""
+
+    },
+    "Android":
+    {
+        "CMP":"",
+        "LINK":""
+    
+    },
+    "Web":
+    {
+        "CMP":"",
+        "LINK":"-s USE_GLFW=3  MIN_WEBGL_VERSION=2",
+    
+        "shell":"raylib.html"
+    },
+    "Windows":
+    {
+        "CMP":"",
+        "LINK":""
+    
+    }
+}
