@@ -10,10 +10,16 @@ The editor helps  streamline your coding process, allowing you to focus on writi
 
 <div id="raw" align="center">
 
+<div>
+  
+https://www.youtube.com/embed/O8G8gn5XW3s
+  
+</div>
+ 
+</div>
 
-[<img src="https://img.youtube.com/vi/O8G8gn5XW3s/maxresdefault.jpg" width="50%">](https://youtu.be/O8G8gn5XW3s)
-  </br>
-https://youtu.be/O8G8gn5XW3s
-  
-  
-  </div>
+<br/>
+
+<div id="raw2" align="center">
+<img align="center" alt="GIF" src="https://github.com/akadjoker/SDLEditor/blob/f7e43edf30a80f9a21481ad14ec55c74e5063d72/out.gif?raw=true" />
+</div>
