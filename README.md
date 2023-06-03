@@ -7,12 +7,13 @@ With its intuitive interface, this editor simplifies the development process by 
 The editor's  enhances the development experience, providing a seamless workflow for creating and exporting programs. 
 
 The editor helps  streamline your coding process, allowing you to focus on writing great code.
+
 <div id="raw" align="center">
 
+
+[<img src="https://img.youtube.com/vi/O8G8gn5XW3s/maxresdefault.jpg" width="50%">](https://youtu.be/O8G8gn5XW3s)
+  </br>
 https://youtu.be/O8G8gn5XW3s
-
-[![Descrição do vídeo]([](https://youtu.be/O8G8gn5XW3s)
-
-<video src='https://youtu.be/O8G8gn5XW3s' width=180/>
+  
   
   </div>
