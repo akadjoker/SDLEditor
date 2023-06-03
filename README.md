@@ -13,6 +13,6 @@ https://youtu.be/O8G8gn5XW3s
 
 [![Descrição do vídeo]([](https://youtu.be/O8G8gn5XW3s)
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/O8G8gn5XW3s" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
-
+<video src='https://youtu.be/O8G8gn5XW3s' width=180/>
+  
   </div>
