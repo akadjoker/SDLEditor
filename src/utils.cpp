@@ -11,7 +11,9 @@
 
 std::vector<std::string> get_result(std::string &input)
 {
-    std::regex regexPattern(R"((.+):(\d+):(\d+): (error|warning): (.+))");
+//    std::regex regexPattern(R"((.+):(\d+):(\d+): (error|warning): (.+))");
+    std::regex regexPattern(R"((.+):(\d+):(\d+): (fatal error|error|warning): (.+))");
+
     std::smatch match;
     std::vector<std::string> result;
 
@@ -38,12 +40,12 @@ std::vector<std::string> get_result(std::string &input)
             std::regex regexRemove(R"(\[.*?\])");
             errorMessage = std::regex_replace(errorMessage, regexRemove, "");
 
-            std::cout << "File Name: " << fileName << std::endl;
-            std::cout << "Function Name: " << functionName << std::endl;
-            std::cout << "Line Number: " << lineNumber << std::endl;
-            std::cout << "Column Number: " << columnNumber << std::endl;
-            std::cout << "Type: " << messageType << std::endl;
-            std::cout << "Message: " << errorMessage << std::endl;
+            // std::cout << "File Name: " << fileName << std::endl;
+            // std::cout << "Function Name: " << functionName << std::endl;
+            // std::cout << "Line Number: " << lineNumber << std::endl;
+            // std::cout << "Column Number: " << columnNumber << std::endl;
+            // std::cout << "Type: " << messageType << std::endl;
+            // std::cout << "Message: " << errorMessage << std::endl;
 
             result.push_back(fileName);
             result.push_back(functionName);
