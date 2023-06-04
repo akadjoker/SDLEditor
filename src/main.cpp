@@ -1523,11 +1523,11 @@ int main(int, char **)
 
             std::vector<char> buffer(consoleText.begin(), consoleText.end());
             buffer.push_back('\0');
-            /// ImGui::TextWrapped("Console",consoleText.c_str(),
+            ImGui::TextWrapped(consoleText.c_str());    
 
-            if (ImGui::InputTextMultiline("Console", buffer.data(), buffer.size(), ImVec2(-1, -1), flags))
-            {
-            }
+            // if (ImGui::InputTextMultiline("Console", buffer.data(), buffer.size(), ImVec2(-1, -1), flags))
+            // {
+            // }
 
             ImGui::End();
         }

@@ -41,7 +41,7 @@ int main()
     
     const char *cwd = GetWorkingDirectory();
     if (cwd != NULL) {
-        printf("Diretório de trabalho %s\n", cwd);
+        printf("Home %s\n", cwd);
     }
 
     while (!exit)
@@ -279,6 +279,8 @@ int main()
 
     return EXIT_SUCCESS;
 }
+
+
 
 
 
