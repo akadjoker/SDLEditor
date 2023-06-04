@@ -18,10 +18,10 @@
     },
     "Web":
     {
-        "CMP":"",
-        "LINK":"-s USE_GLFW=3  MIN_WEBGL_VERSION=2",
-    
-        "shell":"raylib.html"
+        "CMP": "",
+        "LINK": "",
+        "shell": "",
+        "useShell": false
     },
     "Windows":
     {

@@ -3,7 +3,7 @@ LIBPATH = libs
 
 CXX = g++
 
-CXXFLAGS = -std=c++11 
+CXXFLAGS = -std=c++17
 CXXFLAGS += 
 
 #CXXFLAGS +=-fsanitize=address -g #-fsanitize=undefined -fno-omit-frame-pointer -g

@@ -1,0 +1,22 @@
+{
+    "name": "gtk4",
+    "CMP": "`pkg-config --cflags gtk4`",
+    "LINK": "`pkg-config --libs gtk4`",
+    "Linux": 
+    {
+        "CMP": "",
+        "LINK": ""
+    },
+    "Android": 
+    {
+        "CMP": "",
+        "LINK": ""
+    },
+    
+    "Web": {
+        "CMP": "",
+        "LINK": "",
+        "shell": "",
+        "useShell": true
+    }
+}

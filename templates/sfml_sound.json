@@ -1,0 +1,19 @@
+{
+    "Android": {
+        "CMP": "",
+        "LINK": ""
+    },
+    "CMP": "-I/media/djoker/data/code/projectos/SDLBuilder/modules/src/sfml/include -DSFML_USE_STATIC_STD_LIBS",
+    "LINK": "-lssfml -lsstb-image -lsfreetype",
+    "Linux": {
+        "CMP": "",
+        "LINK": "-lGL -lc -lm -lpthread -ludev -ldl -lrt  -lX11 -lXext -lXrandr -lXi"
+    },
+    "Web": {
+        "CMP": "",
+        "LINK": "",
+        "shell": "",
+        "useShell": false
+    },
+    "name": ""
+}

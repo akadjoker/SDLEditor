@@ -1,32 +1,19 @@
 {
-    "name":"RayLib Satic",
-
-    "CMP":"",
-    "LINK":"-lraylib -lm",
-
-    "Linux":
-    {
-        "CMP":"",
-        "LINK":""
-
+    "Android": {
+        "CMP": "",
+        "LINK": ""
     },
-    "Android":
-    {
-        "CMP":"",
-        "LINK":""
-    
+    "CMP": "",
+    "LINK": "-lsraylib  -lm",
+    "Linux": {
+        "CMP": "",
+        "LINK": ""
     },
-    "Web":
-    {
-        "CMP":"",
-        "LINK":"-s USE_GLFW=3 -s ASYNCIFY -s EXPORTED_RUNTIME_METHODS=ccall",
-    
-        "shell":"raylib.html"
+    "Web": {
+        "CMP": "",
+        "LINK": "-s USE_GLFW=3 -s USE_PTHREADS=1 -s ASYNCIFY=1 ",
+        "shell": "/media/djoker/data/code/projectos/SDLBuilder/modules/src/raylib/src/shell.html",
+        "useShell": true
     },
-    "Windows":
-    {
-        "CMP":"",
-        "LINK":""
-    
-    }
+    "name": "raylib"
 }

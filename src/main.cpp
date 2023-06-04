@@ -10,12 +10,116 @@
 #include <SDL2/SDL.h>
 #include "portable-file-dialogs.h"
 
+#if defined(_WIN32)
+#include <direct.h>    // Required for: _getch(), _chdir()
+#define GETCWD _getcwd // NOTE: MSDN recommends not to use getcwd(), chdir()
+#define CHDIR _chdir
+#include <io.h> // Required for: _access() [Used in FileExists()]
+#else
+#include <unistd.h> // Required for: getch(), chdir() (POSIX), access()
+#define GETCWD getcwd
+#define CHDIR chdir
+#endif
+
 #if !SDL_VERSION_ATLEAST(2, 0, 17)
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
 #endif
 
 #include "nlohmann/json.hpp"
 using json = nlohmann::json;
+
+bool ChangeDirectory(const char *dir)
+{
+    bool result = CHDIR(dir);
+
+    return (result == 0);
+}
+#define MAX_FILEPATH_LENGTH 256
+const char *GetWorkingDirectory(void)
+{
+    static char currentDir[MAX_FILEPATH_LENGTH] = {0};
+    memset(currentDir, 0, MAX_FILEPATH_LENGTH);
+
+    char *path = GETCWD(currentDir, MAX_FILEPATH_LENGTH - 1);
+
+    return path;
+}
+
+const char *GetApplicationDirectory(void)
+{
+    static char appDir[MAX_FILEPATH_LENGTH] = {0};
+    memset(appDir, 0, MAX_FILEPATH_LENGTH);
+
+#if defined(_WIN32)
+    int len = 0;
+#if defined(UNICODE)
+    unsigned short widePath[MAX_PATH];
+    len = GetModuleFileNameW(NULL, widePath, MAX_PATH);
+    len = WideCharToMultiByte(0, 0, widePath, len, appDir, MAX_PATH, NULL, NULL);
+#else
+    len = GetModuleFileNameA(NULL, appDir, MAX_PATH);
+#endif
+    if (len > 0)
+    {
+        for (int i = len; i >= 0; --i)
+        {
+            if (appDir[i] == '\\')
+            {
+                appDir[i + 1] = '\0';
+                break;
+            }
+        }
+    }
+    else
+    {
+        appDir[0] = '.';
+        appDir[1] = '\\';
+    }
+
+#elif defined(__linux__)
+    unsigned int size = sizeof(appDir);
+    ssize_t len = readlink("/proc/self/exe", appDir, size);
+
+    if (len > 0)
+    {
+        for (int i = len; i >= 0; --i)
+        {
+            if (appDir[i] == '/')
+            {
+                appDir[i + 1] = '\0';
+                break;
+            }
+        }
+    }
+    else
+    {
+        appDir[0] = '.';
+        appDir[1] = '/';
+    }
+#elif defined(__APPLE__)
+    uint32_t size = sizeof(appDir);
+
+    if (_NSGetExecutablePath(appDir, &size) == 0)
+    {
+        int len = strlen(appDir);
+        for (int i = len; i >= 0; --i)
+        {
+            if (appDir[i] == '/')
+            {
+                appDir[i + 1] = '\0';
+                break;
+            }
+        }
+        else
+        {
+            appDir[0] = '.';
+            appDir[1] = '/';
+        }
+#endif
+
+    return appDir;
+}
+
 
 void setFontWithSize(const char *fontPath, float fontSize)
 {
@@ -26,7 +130,9 @@ void setFontWithSize(const char *fontPath, float fontSize)
 }
 
 std::string fileToEdit = ""; // "src/TextEditor.cpp";
-std::string lastPath = "/media/djoker/data/code/projectos/sdl/imgui/test/";
+std::string lastPath = "";
+std::string modulesPath = "/media/djoker/data/code/projectos/SDLBuilder/modules";
+
 std::string lastFileName = "";
 std::string lastFileExtension = "";
 std::string lastFile = "";
@@ -43,6 +149,8 @@ std::string linkingAndroidFlags = "";
 
 std::string compilerWebFlags = "";
 std::string linkingWebFlags = "";
+std::string shellWeb = "";
+bool useShellWeb = false;
 
 std::string emskPath = "/media/djoker/data/emsdk/upstream/emscripten";
 std::string androidSdkPath = "";
@@ -58,7 +166,7 @@ static char buildAndroidBuffer[256] = "";
 
 static char compileWebBuffer[256] = "";
 static char buildWebBuffer[256] = "";
-
+static char shellWebBuffer[256] = "";
 static char compileLinuxBuffer[256] = "";
 static char buildLinuxBuffer[256] = "";
 
@@ -94,6 +202,16 @@ void setCompileFlags(const std::string &string)
     compilerFlags += string;
 }
 
+std::mutex consoleMutex;
+
+void sendToConsole(const std::string &text)
+{
+    std::lock_guard<std::mutex> lock(consoleMutex);
+    SDL_Event updateEvent;
+    updateEvent.type = SDL_UPDATE_CONSOLE_OUTPUT;
+    updateEvent.user.data1 = new std::string(text);
+    SDL_PushEvent(&updateEvent);
+}
 const char *platformName(Platform p)
 {
     switch (p)
@@ -116,50 +234,63 @@ const char *platformName(Platform p)
 
 void writeConfiJsonFile()
 {
-    json data;
-    data["autoSave"] = autoSave;
-    data["showConsole"] = showConsole;
-
-    data["compilerFlags"] = compilerFlags;
-    data["linkingFlags"] = linkingFlags;
-
-    data["compilerLinuxFlags"] = compilerLinuxFlags;
-    data["linkingLinuxFlags"] = linkingLinuxFlags;
-
-    data["compilerAndroidFlags"] = compilerAndroidFlags;
-    data["linkingAndroidFlags"] = linkingAndroidFlags;
-
-    data["compilerWebFlags"] = compilerWebFlags;
-    data["linkingWebFlags"] = linkingWebFlags;
-
-    data["lastFile"] = lastFileOpen;
-    data["windowWidth"] = Window_Width;
-    data["windowHeight"] = Window_Height;
-    data["clang"] = isClang;
-    data["emsdk"] = emskPath;
-    data["androidSdk"] = androidSdkPath;
-    data["androidNdk"] = androidNdkPath;
-    data["javaPath"] = javaPath;
-    data["lastPlatform"] = (int)current_platform;
-
-    std::ofstream file("config.json");
-    if (file.is_open())
+    try
     {
-        file << std::setw(4) << data; // Formatação com 4 tabs
+        json data;
+        data["autoSave"] = autoSave;
+        data["showConsole"] = showConsole;
 
-        file.close();
+        data["compilerFlags"] = compilerFlags;
+        data["linkingFlags"] = linkingFlags;
+
+        data["compilerLinuxFlags"] = compilerLinuxFlags;
+        data["linkingLinuxFlags"] = linkingLinuxFlags;
+
+        data["compilerAndroidFlags"] = compilerAndroidFlags;
+        data["linkingAndroidFlags"] = linkingAndroidFlags;
+
+        data["compilerWebFlags"] = compilerWebFlags;
+        data["linkingWebFlags"] = linkingWebFlags;
+
+        data["modulesPath"] = modulesPath;
+        data["lastFile"] = lastFileOpen;
+        data["windowWidth"] = Window_Width;
+        data["windowHeight"] = Window_Height;
+        data["clang"] = isClang;
+        data["emsdk"] = emskPath;
+        data["androidSdk"] = androidSdkPath;
+        data["androidNdk"] = androidNdkPath;
+        data["javaPath"] = javaPath;
+        data["lastPlatform"] = (int)current_platform;
+
+        std::ofstream file("config.json");
+        if (file.is_open())
+        {
+            file << std::setw(4) << data; // Formatação com 4 tabs
+
+            file.close();
+        }
+        else
+        {
+            std::cout << "Error savinf JSON." << std::endl;
+        }
     }
-    else
+    catch (const std::exception &ex)
     {
-        std::cout << "Erro ao gravar o arquivo JSON." << std::endl;
+        std::cerr << "Error: " << ex.what() << std::endl;
+        sendToConsole("Error: " + std::string(ex.what()));
     }
 }
 
 void readConfigJsonFile()
 {
-    std::ifstream file("config.json");
-    if (file.is_open())
+    try
     {
+        std::ifstream file("config.json");
+        if (!file.is_open())
+        {
+            throw std::runtime_error("Failed to open config.json file.");
+        }
         json data;
         file >> data;
 
@@ -189,6 +320,8 @@ void readConfigJsonFile()
         strcpy(compileWebBuffer, compilerWebFlags.c_str());
         strcpy(buildWebBuffer, linkingWebFlags.c_str());
 
+        modulesPath = data["modulesPath"].get<std::string>();
+
         lastFileOpen = data["lastFile"].get<std::string>();
         Window_Width = data["windowWidth"].get<int>();
         Window_Height = data["windowHeight"].get<int>();
@@ -201,70 +334,102 @@ void readConfigJsonFile()
 
         file.close();
     }
-    else
+    catch (const std::exception &ex)
     {
-        std::cout << "Erro ao ler o arquivo JSON." << std::endl;
+        std::cerr << "Error: " << ex.what() << std::endl;
+        sendToConsole("Error: " + std::string(ex.what()));
     }
 }
 
 void writeTemapleJsonFile(const std::string &f)
 {
-    json data;
-    data["autoSave"] = autoSave;
-    data["showConsole"] = showConsole;
-    data["lastPlatform"] = (int)current_platform;
-
-    std::ofstream file(f);
-    if (file.is_open())
+    try
     {
-        file << std::setw(4) << data;
+        json data;
+        data["name"] = "";
+        data["CMP"] = compilerFlags;
+        data["LINK"] = linkingFlags;
 
-        file.close();
+        data["Linux"]["CMP"] = compilerLinuxFlags;
+        data["Linux"]["LINK"] = linkingLinuxFlags;
+
+        data["Android"]["CMP"] = compilerAndroidFlags;
+        data["Android"]["LINK"] = linkingAndroidFlags;
+
+        data["Web"]["CMP"] = compilerWebFlags;
+        data["Web"]["LINK"] = linkingWebFlags;
+        data["Web"]["shell"] = shellWeb;
+        data["Web"]["useShell"] = useShellWeb;
+
+        std::ofstream file(f);
+        if (file.is_open())
+        {
+            file << std::setw(4) << data;
+
+            file.close();
+        }
+        else
+        {
+            std::cout << "Erro ao gravar o arquivo JSON." << std::endl;
+        }
     }
-    else
+    catch (const std::exception &ex)
     {
-        std::cout << "Erro ao gravar o arquivo JSON." << std::endl;
+        std::cerr << "Error: " << ex.what() << std::endl;
+        sendToConsole("Error: " + std::string(ex.what()));
     }
 }
 
 void readTemapleJsonFile(const std::string &f)
 {
-    std::ifstream file(f);
-    if (file.is_open())
+    try
     {
-        json data;
-        file >> data;
+        std::ifstream file(f);
+        if (file.is_open())
+        {
+            json data;
+            file >> data;
 
-        std::string name = data["name"].get<std::string>();
-        compilerFlags = data["CMP"].get<std::string>();
-        linkingFlags = data["LINK"].get<std::string>();
+            std::string name = data["name"].get<std::string>();
+            compilerFlags = data["CMP"].get<std::string>();
+            linkingFlags = data["LINK"].get<std::string>();
 
-        compilerLinuxFlags = data["Linux"]["CMP"].get<std::string>();
-        linkingLinuxFlags = data["Linux"]["LINK"].get<std::string>();
+            compilerLinuxFlags = data["Linux"]["CMP"].get<std::string>();
+            linkingLinuxFlags = data["Linux"]["LINK"].get<std::string>();
 
-        compilerAndroidFlags = data["Android"]["CMP"].get<std::string>();
-        linkingAndroidFlags = data["Android"]["LINK"].get<std::string>();
+            compilerAndroidFlags = data["Android"]["CMP"].get<std::string>();
+            linkingAndroidFlags = data["Android"]["LINK"].get<std::string>();
 
-        compilerWebFlags = data["Web"]["CMP"].get<std::string>();
-        linkingWebFlags = data["Web"]["LINK"].get<std::string>();
+            compilerWebFlags = data["Web"]["CMP"].get<std::string>();
+            linkingWebFlags = data["Web"]["LINK"].get<std::string>();
+            shellWeb = data["Web"]["shell"].get<std::string>();
+            useShellWeb = data["Web"]["useShell"].get<bool>();
 
-        strcpy(compileBuffer, compilerFlags.c_str());
-        strcpy(buildBuffer, linkingFlags.c_str());
+            strcpy(compileBuffer, compilerFlags.c_str());
+            strcpy(buildBuffer, linkingFlags.c_str());
 
-        strcpy(compileLinuxBuffer, compilerLinuxFlags.c_str());
-        strcpy(buildLinuxBuffer, linkingLinuxFlags.c_str());
+            strcpy(compileLinuxBuffer, compilerLinuxFlags.c_str());
+            strcpy(buildLinuxBuffer, linkingLinuxFlags.c_str());
 
-        strcpy(compileAndroidBuffer, compilerAndroidFlags.c_str());
-        strcpy(buildAndroidBuffer, linkingAndroidFlags.c_str());
+            strcpy(compileAndroidBuffer, compilerAndroidFlags.c_str());
+            strcpy(buildAndroidBuffer, linkingAndroidFlags.c_str());
 
-        strcpy(compileWebBuffer, compilerWebFlags.c_str());
-        strcpy(buildWebBuffer, linkingWebFlags.c_str());
+            strcpy(compileWebBuffer, compilerWebFlags.c_str());
+            strcpy(buildWebBuffer, linkingWebFlags.c_str());
 
-        file.close();
+            strcpy(shellWebBuffer, shellWeb.c_str());
+
+            file.close();
+        }
+        else
+        {
+            std::cout << "Erro ao ler o arquivo JSON." << std::endl;
+        }
     }
-    else
+    catch (const std::exception &ex)
     {
-        std::cout << "Erro ao ler o arquivo JSON." << std::endl;
+        std::cerr << "Error: " << ex.what() << std::endl;
+        sendToConsole("Error: " + std::string(ex.what()));
     }
 }
 
@@ -313,17 +478,6 @@ void SaveFile(const std::string &filePath, TextEditor &editor)
     t.close();
 }
 
-std::mutex consoleMutex;
-
-void sendToConsole(const std::string &text)
-{
-    //  std::lock_guard<std::mutex> lock(consoleMutex);
-    SDL_Event updateEvent;
-    updateEvent.type = SDL_UPDATE_CONSOLE_OUTPUT;
-    updateEvent.user.data1 = new std::string(text);
-    SDL_PushEvent(&updateEvent);
-}
-
 int async_process(const std::string &command)
 {
 
@@ -352,14 +506,6 @@ int async_process(const std::string &command)
     return process.get_exit_status();
 }
 
-/*
-PATH += /media/djoker/data/emsdk
-PATH += /media/djoker/data/emsdk/upstream/emscripten
-EMSDK = /media/djoker/data/emsdk
-EMSDK_NODE = /media/djoker/data/emsdk/node/15.14.0_64bit/bin/node
-
-
-*/
 std::string getCompiler()
 {
     std::string compiler;
@@ -410,18 +556,18 @@ std::string linuxCompileCommand()
         command += " -g ";
     else
         command += " -DNDEBUG ";
-    std::string includePath = rootPath + pathSeparator + "modules" + pathSeparator + "include";
+    std::string includePath = "-I" + modulesPath + "/include -I" + modulesPath + "/include/Linux ";
 
-      if (mkdir( std::string(lastPath + pathSeparator +"OBJ"+pathSeparator).c_str(), 0777) == 0)
+    if (mkdir(std::string(lastPath + pathSeparator + "OBJ" + pathSeparator).c_str(), 0777) == 0)
     {
-       // std::cout << "Folder " << outputPath << " Created." << std::endl;
+        // std::cout << "Folder " << outputPath << " Created." << std::endl;
     }
 
-    command += "-I" + includePath + " ";
+    command += includePath;
     command += " " + compilerFlags + " " + compilerLinuxFlags + " -c ";
     command += fileToEdit;
     command += " -o ";
-    command += lastPath + pathSeparator +"OBJ" + pathSeparator + lastFile + ".o";
+    command += lastPath + pathSeparator + "OBJ" + pathSeparator + lastFile + ".o";
     return command;
 }
 
@@ -432,10 +578,11 @@ std::string linuxBuildCommand()
     command += " -o ";
     command += lastPath + pathSeparator + lastFile;
     command += " ";
-    command += lastPath + pathSeparator +"OBJ"+pathSeparator + lastFile + ".o ";
+    command += lastPath + pathSeparator + "OBJ" + pathSeparator + lastFile + ".o ";
 
-    std::string libPath = rootPath + pathSeparator + "modules" + pathSeparator + "lib" + pathSeparator + "linux";
-    command += "-L" + libPath + " ";
+    std::string libPath = "-L" + modulesPath + "/libs/Linux ";
+
+    command += libPath;
 
     command += linkingFlags + " " + linkingLinuxFlags;
     return command;
@@ -448,21 +595,18 @@ std::string webCompileCommand()
         command += " -g ";
     else
         command += " -DNDEBUG ";
-    std::string includePath = rootPath + pathSeparator + "modules" + pathSeparator + "include";
-    command += "-I" + includePath + " ";
-    command += "-I" + includePath + pathSeparator + "Web";
 
-    if (mkdir( std::string(lastPath + pathSeparator +"OBJ"+pathSeparator).c_str(), 0777) == 0)
+    std::string includePath = "-I" + modulesPath + "/include -I" + modulesPath + "/include/Web ";
+    if (mkdir(std::string(lastPath + pathSeparator + "OBJ" + pathSeparator).c_str(), 0777) == 0)
     {
-       // std::cout << "Folder " << outputPath << " Created." << std::endl;
+        // std::cout << "Folder " << outputPath << " Created." << std::endl;
     }
 
-
-
+    command += includePath;
     command += " " + compilerFlags + " " + compilerWebFlags + " -c ";
     command += fileToEdit;
     command += " -o ";
-    command += lastPath + pathSeparator+"OBJ"+pathSeparator + lastFile + ".o";
+    command += lastPath + pathSeparator + "OBJ" + pathSeparator + lastFile + ".o";
     return command;
 }
 
@@ -477,18 +621,29 @@ std::string webBuildCommand()
     command += " -o ";
     command += lastPath + pathSeparator + "web_" + lastFile + pathSeparator + lastFile + ".html";
     command += " ";
-    command += lastPath + pathSeparator +"OBJ"+pathSeparator + lastFile + ".o ";
+    command += lastPath + pathSeparator + "OBJ" + pathSeparator + lastFile + ".o ";
+    if (useShellWeb)
+    {
+        command += " --shell-file " + shellWeb + " ";
+    }
 
-    std::string libPath = rootPath + pathSeparator + "modules" + pathSeparator + "lib" + pathSeparator + "web";
-    command += "-L" + libPath + " ";
+    /*
+
+    std::string shellWeb = "";
+bool        useShellWeb = false;*/
+
+    //--shell-file path/to/custom_shell.html
+
+    std::string libPath = "-L" + modulesPath + "/libs/Web ";
+    command += libPath;
 
     command += linkingFlags + " " + linkingWebFlags;
 
     if (mkdir(outputPath.c_str(), 0777) == 0)
     {
-       // std::cout << "Folder " << outputPath << " Created." << std::endl;
+        // std::cout << "Folder " << outputPath << " Created." << std::endl;
     }
-   
+
     return command;
 }
 
@@ -549,6 +704,7 @@ void executeProcess(Async::Semaphore &semaphore, const std::string &command)
         TinyProcessLib::Process process(command, "", printOutput, printOutput);
         int exit_status = process.get_exit_status();
         sendToConsole("Exit with status: " + std::to_string(exit_status));
+        ChangeDirectory(rootPath.c_str());
     }
     break;
     case Platform::Web:
@@ -561,13 +717,12 @@ void executeProcess(Async::Semaphore &semaphore, const std::string &command)
     }
     }
 
-
     semaphore.signal();
 }
 
 void runExecutable(const std::string &command)
 {
-    sendToConsole("Running: " + lastFile + "\n");
+    // sendToConsole("Running: " + lastFile + "\n");
     Async::Semaphore semaphore(1);
     semaphore.wait();
     std::thread t(executeProcess, std::ref(semaphore), command);
@@ -580,18 +735,21 @@ bool doRun()
         return false;
 
     std::string command;
-   
+
     switch (current_platform)
     {
     case Platform::Linux:
+    {
+        ChangeDirectory(lastPath.c_str());
         command = lastPath + pathSeparator + lastFile;
         break;
+    }
     case Platform::Web:
     {
         //   std::string outputPath = lastPath + pathSeparator + "Web" + lastFile;
-           std::string outputPath= lastPath + pathSeparator + "web_" + lastFile + pathSeparator + lastFile + ".html";
+        std::string outputPath = lastPath + pathSeparator + "web_" + lastFile + pathSeparator + lastFile + ".html";
 
-        command = rootPath + pathSeparator + "cserver_linux "+outputPath;
+        command = "emrun --kill_start --kill_exit " + outputPath;
         break;
     }
     }
@@ -603,7 +761,7 @@ bool doRun()
 
 bool doCompile(TextEditor &editor)
 {
-    bool result = false;
+    bool result = true;
     std::string command;
     std::string output;
 
@@ -613,72 +771,70 @@ bool doCompile(TextEditor &editor)
 
     output = run_command(command);
 
-    // TinyProcessLib::Process process(
-    //     command, "",
-    //     [&](const char *bytes, size_t n)
-    //     {
-    //         output += std::string(bytes, n);
-    //         if (bytes[n - 1] != '\n')
-    //             output += "\n";
-    //         sendToConsole(output);
-    //     },
-    //     [&](const char *bytes, size_t n)
-    //     {
-    //         output += std::string(bytes, n);
-    //         if (bytes[n - 1] != '\n')
-    //             output += "\n";
-    //         sendToConsole(output);
-    //     },true);
-    // auto exit_status = process.get_exit_status();
-
     consoleText = "";
-    // consoleText += command + "\n";
-    sendToConsole(command + "\n");
+    consoleText += output;
 
-    //  std::cout << output << std::endl;
-
-    if (output != "")
+    if (!output.empty())
     {
-        replace_character(output, "‘", "'");
-        replace_character(output, "’", "'");
-
-        std::vector<std::string> lines = get_result(output);
-        if (lines.size() == 6)
+        std::cout << output << std::endl;
+        size_t position = output.find("error:");
+        if (position != std::string::npos)
         {
-            //  consoleText = output;
-            consoleText += lines[4] + "\n";
-            consoleText += lines[0] + "\n";
-            consoleText += "At Function (" + lines[1] + ") Line: " + lines[2] + " Column: " + lines[3] + "\n";
-            std::string msg = lines[5];
-
-            TextEditor::Coordinates coord;
-            coord.mLine = std::stoi(lines[2]) - 1;
-            coord.mColumn = std::stoi(lines[3]);
-            editor.SetCursorPosition(coord);
-
-            consoleText += msg + ".\n";
-            consoleText += output;
+            sendToConsole(output);
+            result = false;
         }
         else
         {
-            consoleText = output;
+            result = true;
         }
+    }
 
-        result = false;
-    }
-    else
-    {
-        result = true;
-        // consoleText += "Compiled successfully.\n";
-        sendToConsole("Compiled successfully.\n");
-    }
+    // consoleText += command + "\n";
+    // sendToConsole(command + "\n");
+
+    //  std::cout << output << std::endl;
+
+    // if (output != "")
+    // {
+    //     replace_character(output, "‘", "'");
+    //     replace_character(output, "’", "'");
+
+    //     std::vector<std::string> lines = get_result(output);
+    //     if (lines.size() == 6)
+    //     {
+    //         //  consoleText = output;
+    //         consoleText += lines[4] + "\n";
+    //         consoleText += lines[0] + "\n";
+    //         consoleText += "At Function (" + lines[1] + ") Line: " + lines[2] + " Column: " + lines[3] + "\n";
+    //         std::string msg = lines[5];
+
+    //         TextEditor::Coordinates coord;
+    //         coord.mLine = std::stoi(lines[2]) - 1;
+    //         coord.mColumn = std::stoi(lines[3]);
+    //         editor.SetCursorPosition(coord);
+
+    //         consoleText += msg + ".\n";
+    //         consoleText += output;
+    //     }
+    //     else
+    //     {
+    //         consoleText = output;
+    //     }
+
+    //     result = false;
+    // }
+    // else
+    // {
+    //     result = true;
+    //     // consoleText += "Compiled successfully.\n";
+    //   //  sendToConsole("Compiled successfully.\n");
+    //   std::cout<<"Compiled successfully.\n";
+    // }
     canBuild = result;
     return result;
 }
 
-
-
-void buildProcess(Async::Semaphore &semaphore, const std::string &command,bool run)
+void buildProcess(Async::Semaphore &semaphore, const std::string &command, bool run)
 {
     std::string output = run_command(command);
     std::cout << output << std::endl;
@@ -692,7 +848,8 @@ void buildProcess(Async::Semaphore &semaphore, const std::string &command,bool r
     }
     else
     {
-        sendToConsole("Build successfully.\n");
+        // sendToConsole("Build successfully.\n");
+        std::cout << "Build successfully.\n";
         std::string obj = lastPath + pathSeparator + lastFile + ".o";
         /*
         if (std::remove(obj.c_str()) == 0)
@@ -701,31 +858,32 @@ void buildProcess(Async::Semaphore &semaphore, const std::string &command,bool r
         }*/
         if (run)
         {
-        switch (current_platform)
-        {
-        case Platform::Linux:
-        {
+            switch (current_platform)
+            {
+            case Platform::Linux:
+            {
                 doRun();
-        }    
-        break;
-        case Platform::Web:
-        {
+            }
+            break;
+            case Platform::Web:
+            {
                 doRun();
-            
-        }
-        break;
-        }
+            }
+            break;
+            }
         }
     }
     semaphore.signal();
 }
 
-void runBuild(const std::string &command,bool run )
+void runBuild(const std::string &command, bool run)
 {
-    sendToConsole("Build: " + lastFile + "\n");
+    // sendToConsole("Build: " + lastFile + "\n");
+    std::cout << "Build: " << lastFile << "\n";
+
     Async::Semaphore semaphore(1);
     semaphore.wait();
-    std::thread t(buildProcess, std::ref(semaphore), command,run);
+    std::thread t(buildProcess, std::ref(semaphore), command, run);
     t.join();
 }
 
@@ -741,17 +899,13 @@ bool doBuild(bool run = false)
 
     std::cout << "Build CMD: " << command << std::endl;
 
-    sendToConsole(command + "\n");
+    // sendToConsole(command + "\n");
 
-
-        std::thread executionThread(runBuild, command,run);
-        executionThread.detach();
-
-
+    std::thread executionThread(runBuild, command, run);
+    executionThread.detach();
 
     return result;
 }
-
 
 const int Rows = 3;
 const int Cols = 8;
@@ -824,13 +978,19 @@ int main(int, char **)
     ImGuiIO &io = ImGui::GetIO();
     (void)io;
 
-    ImGui::StyleColorsDark();
+    // ImGui::StyleColorsDark();
+    ImGuiStyle &style = ImGui::GetStyle();
+    // ImGui::StyleColorsVSModernDark(&style);
+    ImGui::StyleColorsXP(&style);
+
     // ImGui::StyleColorsClassic();
 
     ImGui_ImplSDL2_InitForSDLRenderer(window);
     ImGui_ImplSDLRenderer_Init(renderer);
 
     setFontWithSize("fonts/Consolas.ttf", 23);
+
+    style.ScaleAllSizes(1.2);
 
     TextEditor editor;
     auto lang = TextEditor::LanguageDefinition::CPlusPlus();
@@ -909,7 +1069,7 @@ int main(int, char **)
                         isSave = true;
                         if (doCompile(editor))
                             doBuild(false);
-        
+
                         break;
                     }
                     else if (event.key.keysym.sym == SDLK_F8)
@@ -920,7 +1080,7 @@ int main(int, char **)
                     {
                         SaveFile(fileToEdit, editor);
                         isSave = true;
-                         if (doCompile(editor))
+                        if (doCompile(editor))
                             doBuild(true);
                         break;
                     }
@@ -1231,7 +1391,7 @@ int main(int, char **)
                     {
                         SaveFile(fileToEdit, editor);
                         isSave = true;
-                       if (doCompile(editor))
+                        if (doCompile(editor))
                             doBuild(false);
                     }
                     // if (ImGui::MenuItem("Build", "F8", nullptr, enableCompiler))
@@ -1362,8 +1522,8 @@ int main(int, char **)
             ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CtrlEnterForNewLine;
 
             std::vector<char> buffer(consoleText.begin(), consoleText.end());
-            buffer.push_back('\0'); // Adicionar o caractere nulo no final do buffer
-                                    //  std::cout<<"OUT:"<<consoleText<<std::endl;
+            buffer.push_back('\0');
+            /// ImGui::TextWrapped("Console",consoleText.c_str(),
 
             if (ImGui::InputTextMultiline("Console", buffer.data(), buffer.size(), ImVec2(-1, -1), flags))
             {
@@ -1411,6 +1571,9 @@ int main(int, char **)
                 ImGui::InputText("##compilerWebFlags", compileWebBuffer, sizeof(compileWebBuffer));
                 ImGui::Text("Linking flags:");
                 ImGui::InputText("##linkingWebFlags", buildWebBuffer, sizeof(buildWebBuffer));
+                ImGui::InputText("##shellWeb", shellWebBuffer, sizeof(shellWebBuffer));
+                ImGui::SameLine();
+                ImGui::Checkbox("Use Shell", &useShellWeb);
                 break;
             }
             case Platform::Linux:
@@ -1419,6 +1582,7 @@ int main(int, char **)
                 ImGui::InputText("##compilerLinuxFlags", compileLinuxBuffer, sizeof(compileLinuxBuffer));
                 ImGui::Text("Linking flags:");
                 ImGui::InputText("##linkingLinuxFlags", buildLinuxBuffer, sizeof(buildLinuxBuffer));
+
                 break;
             }
             }
@@ -1474,6 +1638,8 @@ int main(int, char **)
 
                 compilerLinuxFlags = std::string(compileLinuxBuffer);
                 linkingLinuxFlags = std::string(buildLinuxBuffer);
+
+                shellWeb = std::string(shellWebBuffer);
 
                 std::cout << "Compiler flags: " << compilerFlags << std::endl;
                 std::cout << "Linking flags: " << linkingFlags << std::endl;

@@ -1,0 +1,22 @@
+{
+    "name": "QT5",
+    "CMP": "-fPIC -std=c++11 -I/home/djoker/Qt/5.15.2/gcc_64/include -I/home/djoker/Qt/5.15.2/gcc_64/include/QtCore -I/home/djoker/Qt/5.15.2/gcc_64/include/QtWidgets",
+    "LINK": "-L/home/djoker/Qt/5.15.2/gcc_64/lib -lQt5Widgets -lQt5Core",
+    "Linux": 
+    {
+        "CMP": "",
+        "LINK": ""
+    },
+    "Android": 
+    {
+        "CMP": "",
+        "LINK": ""
+    },
+    
+    "Web": {
+        "CMP": "",
+        "LINK": "",
+        "shell": "",
+        "useShell": false
+    }
+}
