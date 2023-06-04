@@ -1521,8 +1521,8 @@ int main(int, char **)
             ImGui::Begin("Console", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
             ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CtrlEnterForNewLine;
 
-            std::vector<char> buffer(consoleText.begin(), consoleText.end());
-            buffer.push_back('\0');
+            // std::vector<char> buffer(consoleText.begin(), consoleText.end());
+            // buffer.push_back('\0');
             ImGui::TextWrapped(consoleText.c_str());    
 
             // if (ImGui::InputTextMultiline("Console", buffer.data(), buffer.size(), ImVec2(-1, -1), flags))
