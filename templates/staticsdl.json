@@ -7,7 +7,7 @@
     "Linux":
     {
         "CMP":"",
-        "LINK":"-lSDL2  -lm"
+        "LINK":"-lssdl2   -lc -lm -lpthread -ldl -lrt  -lX11 -lXext -lXi -ludev -lpulse -ldl"
 
     },
     "Android":

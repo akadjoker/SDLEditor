@@ -173,7 +173,7 @@ static char buildLinuxBuffer[256] = "";
 bool useRaylib = false;
 bool useSDL = false;
 bool useGLFW = false;
-
+bool useFullScreen=false;
 bool isClang = false;
 bool isDebug = true;
 bool isCpp = false;
@@ -947,7 +947,7 @@ int main(int, char **)
         return -1;
     }
 
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |  SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window *window = SDL_CreateWindow("Cross Builder by DjokerSoft v.0.01", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Window_Width, Window_Height, window_flags);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
     if (renderer == NULL)
@@ -980,7 +980,7 @@ int main(int, char **)
 
     // ImGui::StyleColorsDark();
     ImGuiStyle &style = ImGui::GetStyle();
-    // ImGui::StyleColorsVSModernDark(&style);
+   // ImGui::StyleColorsVSModernDark(&style);
     ImGui::StyleColorsXP(&style);
 
     // ImGui::StyleColorsClassic();
@@ -990,7 +990,7 @@ int main(int, char **)
 
     setFontWithSize("fonts/Consolas.ttf", 23);
 
-    style.ScaleAllSizes(1.2);
+    style.ScaleAllSizes(1.0);
 
     TextEditor editor;
     auto lang = TextEditor::LanguageDefinition::CPlusPlus();
@@ -1095,6 +1095,26 @@ int main(int, char **)
                     showConsole = !showConsole;
                     break;
                 }
+                if (event.key.keysym.sym == SDLK_F10)
+                {
+                        useFullScreen = !useFullScreen;
+                        if (useFullScreen)
+                        {
+                            SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
+                            SDL_SetWindowBordered(window, SDL_FALSE);
+                            SDL_SetWindowResizable(window,SDL_FALSE);
+                            sendToConsole("Switch to fullscreen\n");
+                        } else
+                        {
+                            SDL_SetWindowBordered(window , SDL_TRUE);
+                            SDL_SetWindowResizable(window,SDL_TRUE);
+                            SDL_RestoreWindow(window);
+                            SDL_SetWindowFullscreen(window, SDL_WINDOW_RESIZABLE);
+                            sendToConsole("Switch to window mode\n");
+                       
+                        }
+
+                }
                 if (event.key.keysym.sym == SDLK_F3)
                 {
                     isDebug = !isDebug;
@@ -1187,6 +1207,150 @@ int main(int, char **)
                 }
             }
         }
+
+
+    if (showOptions)
+        {
+      //  ImGui::SetNextWindowPos(ImVec2(100,100));
+   //     ImGui::SetNextWindowSize(ImVec2(display_w, consoleSize));
+     
+            std::vector<char> bufferCompile(compilerFlags.begin(), compilerFlags.end());
+            bufferCompile.push_back('\0');
+            std::vector<char> bufferLink(linkingFlags.begin(), linkingFlags.end());
+            bufferLink.push_back('\0');
+
+            ImGui::Begin("Compiler Options");
+            ImGui::Text("Compile flags:");
+            ImGui::InputText("##compilerFlags", compileBuffer, sizeof(compileBuffer));
+            // ImGui::InputTextMultiline("##compilerFlags", bufferCompile.data(), bufferCompile.size());
+            ImGui::Text("Linking flags:");
+            // ImGui::InputTextMultiline("##linkingFlags", bufferLink.data(), bufferLink.size());
+            ImGui::InputText("##linkingFlags", buildBuffer, sizeof(buildBuffer));
+            ImGui::Separator();
+
+            ImGui::Text("Platform: %s", platformName(current_platform));
+
+            ImGui::Separator();
+
+            switch (current_platform)
+            {
+            case Platform::Android:
+            {
+                ImGui::Text("Compile flags:");
+                ImGui::InputText("##compilerAndroidFlags", compileAndroidBuffer, sizeof(compileAndroidBuffer));
+                ImGui::Text("Linking flags:");
+                ImGui::InputText("##linkingAndroidFlags", buildAndroidBuffer, sizeof(buildAndroidBuffer));
+                break;
+            }
+            case Platform::Web:
+            {
+                ImGui::Text("Compile flags:");
+                ImGui::InputText("##compilerWebFlags", compileWebBuffer, sizeof(compileWebBuffer));
+                ImGui::Text("Linking flags:");
+                ImGui::InputText("##linkingWebFlags", buildWebBuffer, sizeof(buildWebBuffer));
+                ImGui::InputText("##shellWeb", shellWebBuffer, sizeof(shellWebBuffer));
+                ImGui::SameLine();
+                ImGui::Checkbox("Use Shell", &useShellWeb);
+                break;
+            }
+            case Platform::Linux:
+            {
+                ImGui::Text("Compile flags:");
+                ImGui::InputText("##compilerLinuxFlags", compileLinuxBuffer, sizeof(compileLinuxBuffer));
+                ImGui::Text("Linking flags:");
+                ImGui::InputText("##linkingLinuxFlags", buildLinuxBuffer, sizeof(buildLinuxBuffer));
+
+                break;
+            }
+            }
+            ImGui::Separator();
+
+            ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize("  Load  ").x) / 2.0f - 100);
+            if (ImGui::Button("  Load  "))
+            {
+                std::string path = rootPath + pathSeparator + "templates" + pathSeparator;
+                std::vector<std::string> filters = {"Json (*.json)", "*.json"};
+                auto result = pfd::open_file("Load File", path, filters, false).result();
+                if (!result.empty())
+                {
+
+                    std::string loadFile = result[0];
+
+                    readTemapleJsonFile(loadFile);
+                }
+            }
+            ImGui::SameLine();
+            ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize("  Save  ").x) / 2.0f + 100);
+            if (ImGui::Button("  Save  "))
+            {
+                std::string path = rootPath + pathSeparator + "templates" + pathSeparator;
+                std::vector<std::string> filters = {"Json (*.json)", "*.json"};
+
+                pfd::save_file result = pfd::save_file("Save File", path, filters, true);
+                std::string fResult = result.result();
+                if (!fResult.empty())
+                {
+                    std::string saveFile = fResult;
+                    if (GetFileExtension(saveFile) == "")
+                    {
+                        saveFile += ".json";
+                    }
+                    writeTemapleJsonFile(saveFile);
+                }
+            }
+            ImGui::Separator();
+            ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize("   Ok   ").x) / 2.0f - 100);
+
+            if (ImGui::Button("   Ok   "))
+            {
+
+                compilerFlags = std::string(compileBuffer);
+                linkingFlags = std::string(buildBuffer);
+
+                compilerAndroidFlags = std::string(compileAndroidBuffer);
+                linkingAndroidFlags = std::string(buildAndroidBuffer);
+
+                compilerWebFlags = std::string(compileWebBuffer);
+                linkingWebFlags = std::string(buildWebBuffer);
+
+                compilerLinuxFlags = std::string(compileLinuxBuffer);
+                linkingLinuxFlags = std::string(buildLinuxBuffer);
+
+                shellWeb = std::string(shellWebBuffer);
+
+                std::cout << "Compiler flags: " << compilerFlags << std::endl;
+                std::cout << "Linking flags: " << linkingFlags << std::endl;
+
+                showOptions = false;
+            }
+            ImGui::SameLine();
+            ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize("Cancelar").x) / 2.0f + 100);
+            if (ImGui::Button("Cancelar"))
+            {
+                showOptions = false;
+            }
+            ImGui::End();
+            if (keyboardState[SDL_SCANCODE_RETURN])
+            {
+                compilerFlags = std::string(compileBuffer);
+                linkingFlags = std::string(buildBuffer);
+
+                compilerAndroidFlags = std::string(compileAndroidBuffer);
+                linkingAndroidFlags = std::string(buildAndroidBuffer);
+
+                compilerWebFlags = std::string(compileWebBuffer);
+                linkingWebFlags = std::string(buildWebBuffer);
+
+                compilerLinuxFlags = std::string(compileLinuxBuffer);
+                linkingLinuxFlags = std::string(buildLinuxBuffer);
+
+                std::cout << "Compiler flags: " << compilerFlags << std::endl;
+                std::cout << "Linking flags: " << linkingFlags << std::endl;
+
+                showOptions = false;
+            }
+        }
+
         int consoleSize = 200;
         auto cpos = editor.GetCursorPosition();
         int size = (showConsole) ? consoleSize + 45 : 45;
@@ -1195,7 +1359,18 @@ int main(int, char **)
         ImGui::SetNextWindowSize(ImVec2(display_w, editorSize));
         if (!showOptions)
         {
-            ImGui::Begin("Text Editor Demo", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_MenuBar);
+            
+            ImGuiWindowFlags flags;
+            if (useFullScreen)
+                flags =ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar;
+            else 
+                flags =ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_MenuBar;
+          
+
+
+            ImGui::Begin("Text Editor Demo", nullptr, flags);
+            //if (!useFullScreen)
+            
             if (ImGui::BeginMenuBar())
             {
                 if (ImGui::BeginMenu("File"))
@@ -1382,6 +1557,8 @@ int main(int, char **)
                         editor.SetPalette(TextEditor::GetRetroBluePalette());
                     if (ImGui::MenuItem("Vs Code palette"))
                         editor.SetPalette(TextEditor::GetVSCodePalette());
+                    
+                    
                     ImGui::EndMenu();
                 }
 
@@ -1487,6 +1664,7 @@ int main(int, char **)
 
                 ImGui::EndMenuBar();
             }
+            
 
             editor.Render("TextEditor");
 
@@ -1513,7 +1691,7 @@ int main(int, char **)
 
         );
         ImGui::End();
-
+//*************************************
         ImGui::SetNextWindowPos(ImVec2(0, statusBarPosY + 40));
         ImGui::SetNextWindowSize(ImVec2(display_w, consoleSize));
         if (showConsole)
@@ -1531,148 +1709,9 @@ int main(int, char **)
 
             ImGui::End();
         }
-        // ImGui::Begin("Modules");
-        // renderGUI();
-        // ImGui::End();
-        if (showOptions)
-        {
+     
 
-            std::vector<char> bufferCompile(compilerFlags.begin(), compilerFlags.end());
-            bufferCompile.push_back('\0');
-            std::vector<char> bufferLink(linkingFlags.begin(), linkingFlags.end());
-            bufferLink.push_back('\0');
-
-            ImGui::Begin("Compiler Options");
-            ImGui::Text("Compile flags:");
-            ImGui::InputText("##compilerFlags", compileBuffer, sizeof(compileBuffer));
-            // ImGui::InputTextMultiline("##compilerFlags", bufferCompile.data(), bufferCompile.size());
-            ImGui::Text("Linking flags:");
-            // ImGui::InputTextMultiline("##linkingFlags", bufferLink.data(), bufferLink.size());
-            ImGui::InputText("##linkingFlags", buildBuffer, sizeof(buildBuffer));
-            ImGui::Separator();
-
-            ImGui::Text("Platform: %s", platformName(current_platform));
-
-            ImGui::Separator();
-
-            switch (current_platform)
-            {
-            case Platform::Android:
-            {
-                ImGui::Text("Compile flags:");
-                ImGui::InputText("##compilerAndroidFlags", compileAndroidBuffer, sizeof(compileAndroidBuffer));
-                ImGui::Text("Linking flags:");
-                ImGui::InputText("##linkingAndroidFlags", buildAndroidBuffer, sizeof(buildAndroidBuffer));
-                break;
-            }
-            case Platform::Web:
-            {
-                ImGui::Text("Compile flags:");
-                ImGui::InputText("##compilerWebFlags", compileWebBuffer, sizeof(compileWebBuffer));
-                ImGui::Text("Linking flags:");
-                ImGui::InputText("##linkingWebFlags", buildWebBuffer, sizeof(buildWebBuffer));
-                ImGui::InputText("##shellWeb", shellWebBuffer, sizeof(shellWebBuffer));
-                ImGui::SameLine();
-                ImGui::Checkbox("Use Shell", &useShellWeb);
-                break;
-            }
-            case Platform::Linux:
-            {
-                ImGui::Text("Compile flags:");
-                ImGui::InputText("##compilerLinuxFlags", compileLinuxBuffer, sizeof(compileLinuxBuffer));
-                ImGui::Text("Linking flags:");
-                ImGui::InputText("##linkingLinuxFlags", buildLinuxBuffer, sizeof(buildLinuxBuffer));
-
-                break;
-            }
-            }
-            ImGui::Separator();
-
-            ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize("  Load  ").x) / 2.0f - 100);
-            if (ImGui::Button("  Load  "))
-            {
-                std::string path = rootPath + pathSeparator + "templates" + pathSeparator;
-                std::vector<std::string> filters = {"Json (*.json)", "*.json"};
-                auto result = pfd::open_file("Load File", path, filters, false).result();
-                if (!result.empty())
-                {
-
-                    std::string loadFile = result[0];
-
-                    readTemapleJsonFile(loadFile);
-                }
-            }
-            ImGui::SameLine();
-            ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize("  Save  ").x) / 2.0f + 100);
-            if (ImGui::Button("  Save  "))
-            {
-                std::string path = rootPath + pathSeparator + "templates" + pathSeparator;
-                std::vector<std::string> filters = {"Json (*.json)", "*.json"};
-
-                pfd::save_file result = pfd::save_file("Save File", path, filters, true);
-                std::string fResult = result.result();
-                if (!fResult.empty())
-                {
-                    std::string saveFile = fResult;
-                    if (GetFileExtension(saveFile) == "")
-                    {
-                        saveFile += ".json";
-                    }
-                    writeTemapleJsonFile(saveFile);
-                }
-            }
-            ImGui::Separator();
-            ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize("   Ok   ").x) / 2.0f - 100);
-
-            if (ImGui::Button("   Ok   "))
-            {
-
-                compilerFlags = std::string(compileBuffer);
-                linkingFlags = std::string(buildBuffer);
-
-                compilerAndroidFlags = std::string(compileAndroidBuffer);
-                linkingAndroidFlags = std::string(buildAndroidBuffer);
-
-                compilerWebFlags = std::string(compileWebBuffer);
-                linkingWebFlags = std::string(buildWebBuffer);
-
-                compilerLinuxFlags = std::string(compileLinuxBuffer);
-                linkingLinuxFlags = std::string(buildLinuxBuffer);
-
-                shellWeb = std::string(shellWebBuffer);
-
-                std::cout << "Compiler flags: " << compilerFlags << std::endl;
-                std::cout << "Linking flags: " << linkingFlags << std::endl;
-
-                showOptions = false;
-            }
-            ImGui::SameLine();
-            ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize("Cancelar").x) / 2.0f + 100);
-            if (ImGui::Button("Cancelar"))
-            {
-                showOptions = false;
-            }
-            ImGui::End();
-            if (keyboardState[SDL_SCANCODE_RETURN])
-            {
-                compilerFlags = std::string(compileBuffer);
-                linkingFlags = std::string(buildBuffer);
-
-                compilerAndroidFlags = std::string(compileAndroidBuffer);
-                linkingAndroidFlags = std::string(buildAndroidBuffer);
-
-                compilerWebFlags = std::string(compileWebBuffer);
-                linkingWebFlags = std::string(buildWebBuffer);
-
-                compilerLinuxFlags = std::string(compileLinuxBuffer);
-                linkingLinuxFlags = std::string(buildLinuxBuffer);
-
-                std::cout << "Compiler flags: " << compilerFlags << std::endl;
-                std::cout << "Linking flags: " << linkingFlags << std::endl;
-
-                showOptions = false;
-            }
-        }
+    
 
         // Rendering
         ImGui::Render();

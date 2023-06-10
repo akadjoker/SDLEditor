@@ -23,3 +23,19 @@ https://www.youtube.com/embed/O8G8gn5XW3s
 <div id="raw2" align="center">
 <img align="center" alt="GIF" src="https://github.com/akadjoker/SDLEditor/blob/f7e43edf30a80f9a21481ad14ec55c74e5063d72/out.gif?raw=true" />
 </div>
+
+License
+
+DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+                  
+ 
+Copyright (C) 2023 Luis Santos  aka DJOKER
+
+Everyone is permitted to copy and distribute verbatim or modified
+copies of this license document, and changing it is allowed as long
+as the name is changed.
+ 
+           DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+  TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+
+ 0. You just DO WHAT THE FUCK YOU WANT TO.

@@ -1,7 +1,7 @@
 {
-    "name": "gtk4",
-    "CMP": "`pkg-config --cflags gtk4`",
-    "LINK": "`pkg-config --libs gtk4`",
+    "name": "gtk3",
+    "CMP": "`pkg-config --cflags gtk+-3.0`",
+    "LINK": "`pkg-config --libs gtk+-3.0`",
     "Linux": 
     {
         "CMP": "",
